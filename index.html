@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ESP32 MQTT 控制中心</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.0/mqtt.min.js"></script>
+    <title>ESP32 环境监控</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.0/mqtt.min.js">
+    </script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Roboto,sans-serif}
         body{background:radial-gradient(ellipse at center,#0d1117 0%,#05080c 100%);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
@@ -29,56 +30,40 @@
         .temp-bar{background:linear-gradient(90deg,#3b82f6,#ef4444)}
         .hum-bar{background:linear-gradient(90deg,#60a5fa,#2563eb)}
         .lux-bar{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
-        .btn-group{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
-        .ctrl-btn{padding:8px 20px;border-radius:30px;border:1px solid rgba(0,150,255,0.25);background:rgba(0,150,255,0.08);color:#7ab8ff;font-weight:600;font-size:0.9rem;cursor:pointer;transition:all 0.25s ease}
+        .btn-group{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+        .ctrl-btn{padding:12px;border-radius:30px;border:1px solid rgba(0,150,255,0.25);background:rgba(0,150,255,0.08);color:#7ab8ff;font-weight:600;font-size:1rem;cursor:pointer;transition:all 0.25s ease}
         .ctrl-btn:hover{background:rgba(0,150,255,0.18);border-color:#4aafff;transform:scale(1.02)}
         .ctrl-btn.on{background:rgba(255,50,50,0.15);border-color:rgba(255,50,50,0.3);color:#ff7b7b}
-        .ctrl-btn.on:hover{background:rgba(255,50,50,0.25)}
-        .control-section{background:rgba(16,26,42,0.7);border-radius:28px;padding:24px 22px;border:1px solid rgba(0,150,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:6px}
-        .control-label{display:flex;align-items:center;gap:12px;font-size:1.1rem;font-weight:500;color:#b0d0ff}
-        .control-label .status{background:rgba(0,150,255,0.06);padding:4px 16px;border-radius:40px;font-size:0.9rem;font-weight:600;border:1px solid transparent}
-        .control-label .status.on{background:rgba(255,50,50,0.15);color:#ff7b7b;border-color:rgba(255,50,50,0.3)}
-        .control-label .status.off{background:rgba(0,150,255,0.05);color:#6a8bb0}
-        .switch{position:relative;display:inline-block;width:56px;height:30px;flex-shrink:0}
-        .switch input{opacity:0;width:0;height:0}
-        .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#1a2a4a;transition:0.3s;border-radius:30px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.6)}
-        .slider::before{content:"";position:absolute;height:22px;width:22px;left:4px;bottom:4px;background:#4a7a9a;transition:0.3s;border-radius:50%;box-shadow:0 0 20px rgba(0,150,255,0.3)}
-        input:checked+.slider{background:#4a1a2a}
-        input:checked+.slider::before{transform:translateX(26px);background:#ff6b6b;box-shadow:0 0 30px rgba(255,50,0,0.4)}
         .footer{text-align:center;margin-top:28px;color:#3a5a7a;font-size:0.8rem;letter-spacing:0.5px}
         .footer span{margin:0 6px;opacity:0.5}
         .last-update{text-align:center;color:#4a7a9a;font-size:0.75rem;margin-top:12px}
-        @media(max-width:600px){.card-grid{grid-template-columns:1fr 1fr;gap:14px}.card-grid .card:last-child{grid-column:span 2}.container{padding:20px 16px}.card .value{font-size:1.8rem}.control-section{flex-direction:column;align-items:stretch;text-align:center}.control-label{justify-content:center}.switch{align-self:center}}
+        @media(max-width:600px){.card-grid{grid-template-columns:1fr 1fr;gap:14px}.card-grid .card:last-child{grid-column:span 2}.container{padding:20px 16px}.card .value{font-size:1.8rem}}
         @media(max-width:400px){.card-grid{grid-template-columns:1fr}.card-grid .card:last-child{grid-column:span 1}}
     </style>
 </head>
 <body>
 <div class="container">
     <h1>🌀 环境监控 <small>ESP32</small></h1>
-    <div class="subtitle">MQTT 直连 · 实时控制</div>
+    <div class="subtitle">MQTT 公网直连 · 无需内网穿透</div>
     <div id="conn-status" class="status-badge disconnected"><span class="dot"></span>连接中...</div>
     <div class="card-grid">
         <div class="card"><div class="icon">🌡️</div><div class="label">温度</div><div class="value"><span id="temp-value">--</span><span class="unit">℃</span></div><div class="progress-container"><div id="temp-bar" class="progress-bar temp-bar"></div></div></div>
         <div class="card"><div class="icon">💧</div><div class="label">湿度</div><div class="value"><span id="hum-value">--</span><span class="unit">%</span></div><div class="progress-container"><div id="hum-bar" class="progress-bar hum-bar"></div></div></div>
-        <div class="card"><div class="icon">☀️</div><div class="label">光照强度</div><div class="value"><span id="lux-value">--</span><span class="unit">lx</span></div><div class="progress-container"><div id="lux-bar" class="progress-bar lux-bar"></div></div></div>
+        <div class="card"><div class="icon">☀️</div><div class="label">光照</div><div class="value"><span id="lux-value">--</span><span class="unit">lx</span></div><div class="progress-container"><div id="lux-bar" class="progress-bar lux-bar"></div></div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+    <div class="btn-group">
         <button id="btn-led" class="ctrl-btn" onclick="sendCmd('led')">⚫ LED 关</button>
         <button id="btn-buzzer" class="ctrl-btn" onclick="sendCmd('buzzer')">🔇 蜂鸣器 关</button>
     </div>
-    <div class="control-section">
-        <div class="control-label"><span>📊 数据上报</span><span id="report-status" class="status on">开启中</span></div>
-        <label class="switch"><input type="checkbox" id="report-toggle" checked onchange="toggleReport(this.checked)"><span class="slider"></span></label>
-    </div>
     <div class="last-update" id="last-update">等待数据...</div>
-    <div class="footer"><span>⏱️ 自动更新</span><span>·</span><span>📶 MQTT 直连</span></div>
+    <div class="footer"><span>⏱️ 自动更新</span><span>·</span><span>📶 公共 MQTT</span></div>
 </div>
 <script>
 // ================================================================
-// ⚠️ 改这里：用你当前 Cpolar 显示的 WebSocket 公网地址
-// 格式：ws://域名:端口（把 tcp:// 换成 ws://）
+// ✅ 公共 MQTT Broker（EMQX）
+// WebSocket 地址：ws://broker.emqx.io:8083/mqtt
 // ================================================================
-const MQTT_BROKER_URL = "ws://7.tcp.cpolar.top:11726";
+const MQTT_BROKER_URL = "ws://broker.emqx.io:8083/mqtt";
 
 const TOPIC_SUB = "esp32/control/cmd";
 const TOPIC_PUB = "esp32/sensor/data";
@@ -88,16 +73,10 @@ let isConnected = false;
 let ledState = false;
 let buzzerState = false;
 
-const tempValue = document.getElementById('temp-value');
-const humValue = document.getElementById('hum-value');
-const luxValue = document.getElementById('lux-value');
-const tempBar = document.getElementById('temp-bar');
-const humBar = document.getElementById('hum-bar');
-const luxBar = document.getElementById('lux-bar');
-const connStatus = document.getElementById('conn-status');
-const lastUpdate = document.getElementById('last-update');
-const reportToggle = document.getElementById('report-toggle');
-const reportStatus = document.getElementById('report-status');
+const el = id => document.getElementById(id);
+const tempValue = el('temp-value'), humValue = el('hum-value'), luxValue = el('lux-value');
+const tempBar = el('temp-bar'), humBar = el('hum-bar'), luxBar = el('lux-bar');
+const connStatus = el('conn-status'), lastUpdate = el('last-update');
 
 function clamp(v,a,b){return Math.min(Math.max(v,a),b)}
 
@@ -117,25 +96,18 @@ function setStatus(ok){
 function sendCmd(type){
     if(!isConnected){ alert('MQTT 未连接'); return; }
     let p = {};
-    if(type==='led'){ ledState=!ledState; p.SetLED=ledState?1:0; document.getElementById('btn-led').textContent = ledState?'🔴 LED 开':'⚫ LED 关'; document.getElementById('btn-led').className='ctrl-btn'+(ledState?' on':''); }
-    if(type==='buzzer'){ buzzerState=!buzzerState; p.buzzer=buzzerState?1:0; document.getElementById('btn-buzzer').textContent = buzzerState?'🔊 蜂鸣器 开':'🔇 蜂鸣器 关'; document.getElementById('btn-buzzer').className='ctrl-btn'+(buzzerState?' on':''); }
+    if(type==='led'){ ledState=!ledState; p.SetLED=ledState?1:0; el('btn-led').textContent = ledState?'🔴 LED 开':'⚫ LED 关'; el('btn-led').className='ctrl-btn'+(ledState?' on':''); }
+    if(type==='buzzer'){ buzzerState=!buzzerState; p.buzzer=buzzerState?1:0; el('btn-buzzer').textContent = buzzerState?'🔊 蜂鸣器 开':'🔇 蜂鸣器 关'; el('btn-buzzer').className='ctrl-btn'+(buzzerState?' on':''); }
     client.publish(TOPIC_SUB, JSON.stringify(p));
 }
 
-function toggleReport(enabled){
-    if(isConnected) client.publish(TOPIC_SUB, JSON.stringify({report:enabled?1:0}));
-    reportStatus.textContent = enabled ? '开启中' : '已暂停';
-    reportStatus.className = 'status ' + (enabled ? 'on' : 'off');
-}
-
 function connectMQTT(){
-    if(!MQTT_BROKER_URL || MQTT_BROKER_URL==="ws://你的域名:你的端口"){
-        connStatus.className='status-badge disconnected';
-        connStatus.innerHTML='<span class="dot"></span>⚠️ 请先配置 MQTT 地址';
-        return;
-    }
     setStatus(false);
-    client = mqtt.connect(MQTT_BROKER_URL, {keepalive:60, reconnectPeriod:5000, connectTimeout:30000});
+    client = mqtt.connect(MQTT_BROKER_URL, {
+        keepalive: 60,
+        reconnectPeriod: 5000,
+        connectTimeout: 30000
+    });
     client.on('connect', function(){
         console.log('✅ MQTT 连接成功');
         setStatus(true);
