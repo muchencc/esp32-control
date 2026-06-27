@@ -44,7 +44,7 @@
 <body>
 <div class="container">
     <h1>🌀 环境监控 <small>ESP32</small></h1>
-    <div class="subtitle">MQTT 公网直连 · 无需内网穿透</div>
+    <div class="subtitle">MQTT 公网直连 · 公共 Broker</div>
     <div id="conn-status" class="status-badge disconnected"><span class="dot"></span>连接中...</div>
     <div class="card-grid">
         <div class="card"><div class="icon">🌡️</div><div class="label">温度</div><div class="value"><span id="temp-value">--</span><span class="unit">℃</span></div><div class="progress-container"><div id="temp-bar" class="progress-bar temp-bar"></div></div></div>
@@ -60,13 +60,14 @@
 </div>
 <script>
 // ================================================================
-// ✅ 公共 MQTT Broker（EMQX）
+// 公共 MQTT Broker（EMQX）
 // WebSocket 地址：ws://broker.emqx.io:8083/mqtt
 // ================================================================
 const MQTT_BROKER_URL = "ws://broker.emqx.io:8083/mqtt";
 
-const TOPIC_SUB = "esp32/control/cmd";
-const TOPIC_PUB = "esp32/sensor/data";
+// ⚠️ 主题与 ESP32 代码保持一致（带唯一标识）
+const TOPIC_SUB = "baimuchen/esp32/control/cmd";
+const TOPIC_PUB = "baimuchen/esp32/sensor/data";
 
 let client = null;
 let isConnected = false;
