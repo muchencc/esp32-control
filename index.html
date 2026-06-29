@@ -2,587 +2,279 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ESP32 环境监控 - FastBee</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.0/mqtt.min.js">
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 环境监控中心</title>
     <style>
-        /* ===== 样式（与之前相同，为节省篇幅保持简洁） ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-        }
-        body {
-            background: radial-gradient(ellipse at center, #0d1117 0%, #05080c 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            max-width: 820px;
-            width: 100%;
-            background: rgba(10, 16, 26, 0.8);
-            backdrop-filter: blur(16px);
-            border-radius: 40px;
-            padding: 30px 25px 40px;
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), inset 0 0 60px rgba(0, 150, 255, 0.05);
-            border: 1px solid rgba(100, 200, 255, 0.12);
-        }
-        h1 {
-            text-align: center;
-            font-weight: 700;
-            font-size: 2rem;
-            color: #b0d4ff;
-            letter-spacing: 3px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            flex-wrap: wrap;
-            text-shadow: 0 0 40px rgba(0, 150, 255, 0.4);
-        }
-        h1 small {
-            font-size: 1rem;
-            font-weight: 400;
-            color: #6a8bb0;
-            background: rgba(0, 150, 255, 0.08);
-            padding: 4px 16px;
+        /* 样式完全沿用你原来的设计，此处压缩为简洁版，实际可原样复制 */
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,sans-serif; }
+        body { background: radial-gradient(ellipse at center, #0d1117 0%, #05080c 100%); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
+        .container { max-width:800px; width:100%; background:rgba(10,16,26,0.8); backdrop-filter:blur(16px); border-radius:40px; padding:30px 25px 40px; box-shadow:0 30px 80px rgba(0,0,0,0.8), inset 0 0 60px rgba(0,150,255,0.05); border:1px solid rgba(100,200,255,0.12); }
+        h1 { text-align:center; font-weight:700; font-size:2rem; color:#b0d4ff; letter-spacing:3px; margin-bottom:10px; display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; text-shadow:0 0 40px rgba(0,150,255,0.4); }
+        h1 small { font-size:1rem; font-weight:400; color:#6a8bb0; background:rgba(0,150,255,0.08); padding:4px 16px; border-radius:30px; border:1px solid rgba(0,150,255,0.15); }
+        .subtitle { text-align:center; color:#6a8bb0; margin-bottom:28px; font-size:0.95rem; letter-spacing:2px; text-transform:uppercase; }
+        .card-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:35px; }
+        .card { background:rgba(16,26,42,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:20px 12px 16px; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.6); transition:transform 0.3s ease, box-shadow 0.3s; border:1px solid rgba(0,150,255,0.08); }
+        .card:hover { transform:translateY(-6px); box-shadow:0 16px 48px rgba(0,100,255,0.2); border-color:rgba(0,150,255,0.25); }
+        .card .icon { font-size:2.8rem; line-height:1.2; margin-bottom:4px; filter:drop-shadow(0 0 15px rgba(0,200,255,0.3)); }
+        .card .label { font-size:0.85rem; font-weight:600; color:#7a9ec7; letter-spacing:1.2px; margin-bottom:6px; text-transform:uppercase; }
+        .card .value { font-size:2.2rem; font-weight:700; color:#e0edff; display:flex; align-items:baseline; justify-content:center; gap:2px; line-height:1.2; transition:opacity 0.3s; text-shadow:0 0 30px rgba(0,150,255,0.15); }
+        .card .value .unit { font-size:1rem; font-weight:400; color:#4a7a9a; margin-left:2px; }
+        .progress-container { width:100%; height:6px; background:rgba(0,150,255,0.08); border-radius:20px; margin-top:14px; overflow:hidden; transition:opacity 0.3s; }
+        .progress-bar { height:100%; width:0%; border-radius:20px; transition:width 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+        .temp-bar { background:linear-gradient(90deg,#3b82f6,#ef4444); }
+        .hum-bar  { background:linear-gradient(90deg,#60a5fa,#2563eb); }
+        .lux-bar  { background:linear-gradient(90deg,#fbbf24,#f59e0b); }
+        .toggle-btn {
+            background: rgba(0,150,255,0.08);
+            border: 1px solid rgba(0,150,255,0.25);
             border-radius: 30px;
-            border: 1px solid rgba(0, 150, 255, 0.15);
-        }
-        .subtitle {
-            text-align: center;
-            color: #6a8bb0;
-            margin-bottom: 28px;
-            font-size: 0.95rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-        .status-badge {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: 0.3s;
-        }
-        .status-badge.connected {
-            background: rgba(0, 255, 100, 0.15);
-            color: #4ade80;
-            border: 1px solid rgba(0, 255, 100, 0.2);
-        }
-        .status-badge.disconnected {
-            background: rgba(255, 50, 50, 0.15);
-            color: #ff6b6b;
-            border: 1px solid rgba(255, 50, 50, 0.2);
-        }
-        .status-badge .dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-badge.connected .dot {
-            background: #4ade80;
-        }
-        .status-badge.disconnected .dot {
-            background: #ff6b6b;
-        }
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 18px;
-            margin-bottom: 28px;
-        }
-        .card {
-            background: rgba(16, 26, 42, 0.7);
-            backdrop-filter: blur(8px);
-            border-radius: 28px;
-            padding: 20px 12px 16px;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(0, 150, 255, 0.08);
-            transition: border-color 0.3s, opacity 0.3s, filter 0.3s;
-        }
-        .card.hidden {
-            opacity: 0.45;
-            filter: grayscale(0.6);
-            border-color: rgba(255, 80, 80, 0.15);
-        }
-        .card.hidden .value {
-            color: #6a7a8a;
-            text-shadow: none;
-        }
-        .card.hidden .label {
-            color: #4a6a7a;
-        }
-        .card .icon {
-            font-size: 2.8rem;
-            line-height: 1.2;
-            margin-bottom: 4px;
-        }
-        .card .label {
+            padding: 8px 18px;
+            margin-top: 14px;
             font-size: 0.85rem;
             font-weight: 600;
-            color: #7a9ec7;
-            letter-spacing: 1.2px;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-        }
-        .card .value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: #e0edff;
-            display: flex;
-            align-items: baseline;
-            justify-content: center;
-            gap: 2px;
-            line-height: 1.2;
-            text-shadow: 0 0 30px rgba(0, 150, 255, 0.15);
-        }
-        .card .value .unit {
-            font-size: 1rem;
-            font-weight: 400;
-            color: #4a7a9a;
-            margin-left: 2px;
-        }
-        .progress-container {
-            width: 100%;
-            height: 6px;
-            background: rgba(0, 150, 255, 0.08);
-            border-radius: 20px;
-            margin-top: 14px;
-            overflow: hidden;
-        }
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            border-radius: 20px;
-            transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .temp-bar {
-            background: linear-gradient(90deg, #3b82f6, #ef4444);
-        }
-        .hum-bar {
-            background: linear-gradient(90deg, #60a5fa, #2563eb);
-        }
-        .lux-bar {
-            background: linear-gradient(90deg, #fbbf24, #f59e0b);
-        }
-        .card-toggle {
-            margin-top: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            cursor: pointer;
-            user-select: none;
-            padding: 6px 14px;
-            border-radius: 30px;
-            background: rgba(0, 150, 255, 0.05);
-            border: 1px solid rgba(0, 150, 255, 0.1);
-            transition: background 0.25s, border-color 0.25s;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #7a9ec7;
-            letter-spacing: 0.5px;
-        }
-        .card-toggle:hover {
-            background: rgba(0, 150, 255, 0.12);
-            border-color: rgba(0, 150, 255, 0.25);
-        }
-        .card-toggle .toggle-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            transition: background 0.3s, box-shadow 0.3s;
-        }
-        .card-toggle .toggle-dot.on {
-            background: #4ade80;
-            box-shadow: 0 0 12px rgba(74, 222, 128, 0.4);
-        }
-        .card-toggle .toggle-dot.off {
-            background: #ff6b6b;
-            box-shadow: 0 0 12px rgba(255, 107, 107, 0.3);
-        }
-        .btn-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .ctrl-btn {
-            padding: 12px;
-            border-radius: 30px;
-            border: 1px solid rgba(0, 150, 255, 0.25);
-            background: rgba(0, 150, 255, 0.08);
             color: #7ab8ff;
-            font-weight: 600;
-            font-size: 1rem;
             cursor: pointer;
             transition: all 0.25s ease;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 20px rgba(0,150,255,0.1);
         }
-        .ctrl-btn:hover {
-            background: rgba(0, 150, 255, 0.18);
+        .toggle-btn:hover {
+            background: rgba(0,150,255,0.18);
             border-color: #4aafff;
+            box-shadow: 0 0 40px rgba(0,150,255,0.3);
             transform: scale(1.02);
         }
-        .ctrl-btn.on {
-            background: rgba(255, 50, 50, 0.15);
-            border-color: rgba(255, 50, 50, 0.3);
+        .toggle-btn.hidden {
+            background: rgba(255,50,50,0.08);
+            border-color: rgba(255,50,50,0.25);
             color: #ff7b7b;
+            box-shadow: 0 0 20px rgba(255,50,0,0.1);
         }
-        .footer {
-            text-align: center;
-            margin-top: 28px;
-            color: #3a5a7a;
-            font-size: 0.8rem;
-            letter-spacing: 0.5px;
+        .toggle-btn.hidden:hover {
+            background: rgba(255,50,50,0.18);
+            border-color: #ff6b6b;
+            box-shadow: 0 0 40px rgba(255,50,0,0.3);
         }
-        .footer span {
-            margin: 0 6px;
-            opacity: 0.5;
+        .control-section { background:rgba(16,26,42,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:24px 22px; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(0,150,255,0.08); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-top:6px; }
+        .control-label { display:flex; align-items:center; gap:12px; font-size:1.1rem; font-weight:500; color:#b0d0ff; }
+        .control-label .icon { font-size:1.8rem; line-height:1; }
+        .control-label .status { background:rgba(0,150,255,0.06); padding:4px 16px; border-radius:40px; font-size:0.9rem; font-weight:600; transition:0.2s; border:1px solid transparent; }
+        .control-label .status.on { background:rgba(255,50,50,0.15); color:#ff7b7b; border-color:rgba(255,50,50,0.3); box-shadow:0 0 20px rgba(255,50,0,0.1); }
+        .control-label .status.off { background:rgba(0,150,255,0.05); color:#6a8bb0; }
+        .switch { position:relative; display:inline-block; width:56px; height:30px; flex-shrink:0; }
+        .switch input { opacity:0; width:0; height:0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#1a2a4a; transition:0.3s; border-radius:30px; box-shadow:inset 0 2px 8px rgba(0,0,0,0.6); }
+        .slider::before { content:""; position:absolute; height:22px; width:22px; left:4px; bottom:4px; background:#4a7a9a; transition:0.3s; border-radius:50%; box-shadow:0 0 20px rgba(0,150,255,0.3); }
+        input:checked + .slider { background:#4a1a2a; }
+        input:checked + .slider::before { transform:translateX(26px); background:#ff6b6b; box-shadow:0 0 30px rgba(255,50,0,0.4); }
+        .footer { text-align:center; margin-top:28px; color:#3a5a7a; font-size:0.8rem; letter-spacing:0.5px; }
+        .footer span { margin:0 6px; opacity:0.5; }
+        @media (max-width:600px) {
+            .card-grid { grid-template-columns:1fr 1fr; gap:14px; }
+            .card-grid .card:last-child { grid-column:span 2; }
+            .container { padding:20px 16px; }
+            .card .value { font-size:1.8rem; }
+            .control-section { flex-direction:column; align-items:stretch; text-align:center; }
+            .control-label { justify-content:center; }
+            .switch { align-self:center; }
         }
-        .last-update {
-            text-align: center;
-            color: #4a7a9a;
-            font-size: 0.75rem;
-            margin-top: 12px;
-        }
-        @media (max-width: 600px) {
-            .card-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 14px;
-            }
-            .card-grid .card:last-child {
-                grid-column: span 2;
-            }
-            .container {
-                padding: 20px 16px;
-            }
-            .card .value {
-                font-size: 1.8rem;
-            }
-        }
-        @media (max-width: 400px) {
-            .card-grid {
-                grid-template-columns: 1fr;
-            }
-            .card-grid .card:last-child {
-                grid-column: span 1;
-            }
-            .btn-group {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width:400px) {
+            .card-grid { grid-template-columns:1fr; }
+            .card-grid .card:last-child { grid-column:span 1; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🌀 环境监控 <small>FastBee</small></h1>
-        <div class="subtitle">MQTT 直连 · 数据保留在平台</div>
-
-        <div id="conn-status" class="status-badge disconnected">
-            <span class="dot"></span>连接中...
+<div class="container">
+    <h1>🌀 环境监控 <small>ESP32</small></h1>
+    <div class="subtitle">实时数据 · 智能控制</div>
+    <div class="card-grid">
+        <div class="card">
+            <div class="icon">🌡️</div>
+            <div class="label">温度</div>
+            <div class="value" id="temp-value">--<span class="unit">℃</span></div>
+            <div class="progress-container"><div id="temp-bar" class="progress-bar temp-bar" style="width:0%;"></div></div>
+            <button class="toggle-btn" data-index="0" id="btn-temp">关闭温度</button>
         </div>
-
-        <!-- 三列传感器卡片 -->
-        <div class="card-grid">
-            <div class="card" id="card-temp">
-                <div class="icon">🌡️</div>
-                <div class="label">温度</div>
-                <div class="value">
-                    <span id="temp-value">--</span><span class="unit">℃</span>
-                </div>
-                <div class="progress-container">
-                    <div id="temp-bar" class="progress-bar temp-bar"></div>
-                </div>
-                <div class="card-toggle" data-param="temperature" onclick="toggleParam('temperature')">
-                    <span class="toggle-dot on" id="dot-temp"></span>
-                    <span class="toggle-label" id="label-temp">显示中</span>
-                </div>
-            </div>
-            <div class="card" id="card-hum">
-                <div class="icon">💧</div>
-                <div class="label">湿度</div>
-                <div class="value">
-                    <span id="hum-value">--</span><span class="unit">%</span>
-                </div>
-                <div class="progress-container">
-                    <div id="hum-bar" class="progress-bar hum-bar"></div>
-                </div>
-                <div class="card-toggle" data-param="humidity" onclick="toggleParam('humidity')">
-                    <span class="toggle-dot on" id="dot-hum"></span>
-                    <span class="toggle-label" id="label-hum">显示中</span>
-                </div>
-            </div>
-            <div class="card" id="card-lux">
-                <div class="icon">☀️</div>
-                <div class="label">光照</div>
-                <div class="value">
-                    <span id="lux-value">--</span><span class="unit">lx</span>
-                </div>
-                <div class="progress-container">
-                    <div id="lux-bar" class="progress-bar lux-bar"></div>
-                </div>
-                <div class="card-toggle" data-param="lux" onclick="toggleParam('lux')">
-                    <span class="toggle-dot on" id="dot-lux"></span>
-                    <span class="toggle-label" id="label-lux">显示中</span>
-                </div>
-            </div>
+        <div class="card">
+            <div class="icon">💧</div>
+            <div class="label">湿度</div>
+            <div class="value" id="hum-value">--<span class="unit">%</span></div>
+            <div class="progress-container"><div id="hum-bar" class="progress-bar hum-bar" style="width:0%;"></div></div>
+            <button class="toggle-btn" data-index="1" id="btn-hum">关闭湿度</button>
         </div>
-
-        <!-- LED & 蜂鸣器控制 -->
-        <div class="btn-group">
-            <button id="btn-led" class="ctrl-btn" onclick="sendCmd('led')">⚫ LED 关</button>
-            <button id="btn-buzzer" class="ctrl-btn" onclick="sendCmd('buzzer')">🔇 蜂鸣器 关</button>
+        <div class="card">
+            <div class="icon">☀️</div>
+            <div class="label">光照强度</div>
+            <div class="value" id="lux-value">--<span class="unit">lx</span></div>
+            <div class="progress-container"><div id="lux-bar" class="progress-bar lux-bar" style="width:0%;"></div></div>
+            <button class="toggle-btn" data-index="2" id="btn-lux">关闭光照</button>
         </div>
-
-        <div class="last-update" id="last-update">等待数据...</div>
-        <div class="footer"><span>⏱️ 自动更新</span><span>·</span><span>📶 FastBee MQTT</span></div>
     </div>
+    <div class="control-section">
+        <div class="control-label">
+            <span class="icon">❓</span>
+            <span>是否反馈异常</span>
+            <span id="feedback-status" class="status off">否</span>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="feedback-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+    <div class="footer"><span>⏱️ 自动更新</span><span>·</span><span>📶 实时</span></div>
+</div>
 
-    <script>
-        // ================================================================
-        //  🚀 请在此处填写您的 FastBee MQTT 连接信息
-        // ================================================================
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.0.0/mqtt.min.js"></script>
+<script>
+    // ---- DOM 引用 ----
+    const tempValue = document.getElementById('temp-value');
+    const humValue  = document.getElementById('hum-value');
+    const luxValue  = document.getElementById('lux-value');
+    const tempBar   = document.getElementById('temp-bar');
+    const humBar    = document.getElementById('hum-bar');
+    const luxBar    = document.getElementById('lux-bar');
+    const feedbackToggle = document.getElementById('feedback-toggle');
+    const feedbackStatus = document.getElementById('feedback-status');
+    const btnTemp = document.getElementById('btn-temp');
+    const btnHum  = document.getElementById('btn-hum');
+    const btnLux  = document.getElementById('btn-lux');
+    const toggleBtns = [btnTemp, btnHum, btnLux];
 
-        // 🔽 修改为您的 FastBee WebSocket 地址（注意协议和端口）
-        //    例如：ws://192.168.1.100:8083/mqtt  或  wss://fastbee.example.com:8084/mqtt
-        const MQTT_BROKER_URL = "ws://182.39.110.118:8083/mqtt";   // ← 务必修改！
-
-        // 从您提供的参数填入（已为您预设）
-        const CLIENT_ID = "S&D427OZYW88P439&1795&1";
-        const USERNAME = "18353976321";
-        const PASSWORD = "P617070YY42H9F3Z";
-
-        // 主题映射（按照 FastBee 规范）
-        const TOPIC_SUB = "/1795/D427OZYW88P439/function/get";    // 前端发布指令 (控制)
-        const TOPIC_PUB = "/1795/D427OZYW88P439/property/post";   // 前端订阅数据 (上报)
-
-        // ================================================================
-        //  以下代码无需修改（除非需要调整数据解析逻辑）
-        // ================================================================
-
-        let client = null;
-        let isConnected = false;
-        let ledState = false;
-        let buzzerState = false;
-
-        // 每个参数的显示开关 (true=显示/更新, false=隐藏/冻结)
-        const paramState = {
-            temperature: true,
-            humidity: true,
-            lux: true
-        };
-
-        // 保存最后一次接收的数据（用于恢复显示时刷新）
-        let lastData = { tem: 0, hum: 0, lux: 0 };
-
-        // DOM 引用
-        const $ = id => document.getElementById(id);
-        const tempValue = $('temp-value'),
-            humValue = $('hum-value'),
-            luxValue = $('lux-value');
-        const tempBar = $('temp-bar'),
-            humBar = $('hum-bar'),
-            luxBar = $('lux-bar');
-        const connStatus = $('conn-status'),
-            lastUpdate = $('last-update');
-        const cardTemp = $('card-temp'),
-            cardHum = $('card-hum'),
-            cardLux = $('card-lux');
-        const dotTemp = $('dot-temp'),
-            dotHum = $('dot-hum'),
-            dotLux = $('dot-lux');
-        const labelTemp = $('label-temp'),
-            labelHum = $('label-hum'),
-            labelLux = $('label-lux');
-
-        function clamp(v, a, b) { return Math.min(Math.max(v, a), b); }
-
-        // 更新 UI（尊重 paramState，若关闭则不更新数值）
-        function updateUI(d) {
-            // 保存最新数据
-            lastData.tem = d.tem !== undefined ? d.tem : lastData.tem;
-            lastData.hum = d.hum !== undefined ? d.hum : lastData.hum;
-            lastData.lux = d.lux !== undefined ? d.lux : lastData.lux;
-
-            // 温度
-            if (paramState.temperature) {
-                tempValue.textContent = lastData.tem.toFixed(1);
-                tempBar.style.width = clamp(lastData.tem / 50 * 100, 0, 100) + '%';
-            }
-            // 湿度
-            if (paramState.humidity) {
-                humValue.textContent = lastData.hum.toFixed(1);
-                humBar.style.width = clamp(lastData.hum, 0, 100) + '%';
-            }
-            // 光照
-            if (paramState.lux) {
-                luxValue.textContent = lastData.lux.toFixed(1);
-                luxBar.style.width = clamp(lastData.lux / 10000 * 100, 0, 100) + '%';
-            }
-
-            // 同步 ESP32 发来的显示状态（如果包含）
-            if (d.display_temperature !== undefined) {
-                paramState.temperature = d.display_temperature === 1;
-            }
-            if (d.display_humidity !== undefined) {
-                paramState.humidity = d.display_humidity === 1;
-            }
-            if (d.display_lux !== undefined) {
-                paramState.lux = d.display_lux === 1;
-            }
-
-            applyParamState();
-            lastUpdate.textContent = '最后更新: ' + new Date().toLocaleTimeString();
+    // ---- UI 显示隐藏控制（保持不变） ----
+    const showState = [true, true, true];
+    const labelMap = {
+        show: ['显示温度', '显示湿度', '显示光照'],
+        hide: ['关闭温度', '关闭湿度', '关闭光照']
+    };
+    function updateButton(index) {
+        const btn = toggleBtns[index];
+        if (showState[index]) {
+            btn.textContent = labelMap.hide[index];
+            btn.classList.remove('hidden');
+        } else {
+            btn.textContent = labelMap.show[index];
+            btn.classList.add('hidden');
         }
+    }
+    function toggleCard(index) {
+        showState[index] = !showState[index];
+        const valueElements = [tempValue, humValue, luxValue];
+        const barElements   = [tempBar, humBar, luxBar];
+        valueElements[index].style.display = showState[index] ? 'flex' : 'none';
+        barElements[index].style.display = showState[index] ? 'block' : 'none';
+        updateButton(index);
+    }
+    toggleBtns.forEach((btn, idx) => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleCard(idx);
+        });
+    });
 
-        // 应用显示状态到卡片
-        function applyParamState() {
-            cardTemp.classList.toggle('hidden', !paramState.temperature);
-            dotTemp.className = 'toggle-dot ' + (paramState.temperature ? 'on' : 'off');
-            labelTemp.textContent = paramState.temperature ? '显示中' : '已冻结';
+    // ---- MQTT 配置（与 ESP32 保持一致） ----
+    const MQTT_HOST = 'iot.fastbee.cn';
+    const MQTT_WS_PORT = 8083;          // WebSocket 端口（非加密），若使用 SSL 则改为 8084 并协议 wss
+    const CLIENT_ID = 'web_' + Math.random().toString(16).substr(2, 8);
+    const USERNAME = '18353976321';      // 替换为你的用户名
+    const PASSWORD = 'P617070YY42H9F3Z'; // 替换为你的密码
+    const SUB_TOPIC = '/1795/D427OZYW88P439/property/post';
+    const PUB_TOPIC = '/1795/D427OZYW88P439/function/get';
 
-            cardHum.classList.toggle('hidden', !paramState.humidity);
-            dotHum.className = 'toggle-dot ' + (paramState.humidity ? 'on' : 'off');
-            labelHum.textContent = paramState.humidity ? '显示中' : '已冻结';
+    let mqttClient = null;
 
-            cardLux.classList.toggle('hidden', !paramState.lux);
-            dotLux.className = 'toggle-dot ' + (paramState.lux ? 'on' : 'off');
-            labelLux.textContent = paramState.lux ? '显示中' : '已冻结';
-        }
+    // ---- 辅助函数：更新 UI ----
+    function clamp(v,min,max){ return Math.min(Math.max(v,min),max); }
+    function updateUI(data) {
+        let temp = data.temperature !== undefined ? data.temperature : 0;
+        tempValue.textContent = temp.toFixed(1);
+        tempBar.style.width = clamp((temp/50)*100,0,100)+'%';
 
-        // 切换参数显示状态（点击卡片内开关）
-        function toggleParam(param) {
-            if (!isConnected) {
-                alert('MQTT 未连接，无法发送指令');
-                return;
-            }
-            paramState[param] = !paramState[param];
+        let hum = data.humidity !== undefined ? data.humidity : 0;
+        humValue.textContent = hum.toFixed(1);
+        humBar.style.width = clamp(hum,0,100)+'%';
 
-            // 如果重新开启，立即用最新数据刷新该参数
-            if (paramState[param]) {
-                if (param === 'temperature') {
-                    tempValue.textContent = lastData.tem.toFixed(1);
-                    tempBar.style.width = clamp(lastData.tem / 50 * 100, 0, 100) + '%';
-                } else if (param === 'humidity') {
-                    humValue.textContent = lastData.hum.toFixed(1);
-                    humBar.style.width = clamp(lastData.hum, 0, 100) + '%';
-                } else if (param === 'lux') {
-                    luxValue.textContent = lastData.lux.toFixed(1);
-                    luxBar.style.width = clamp(lastData.lux / 10000 * 100, 0, 100) + '%';
-                }
-            }
+        let lux = data.lux !== undefined ? data.lux : 0;
+        luxValue.textContent = lux.toFixed(1);
+        luxBar.style.width = clamp((lux/10000)*100,0,100)+'%';
+    }
 
-            applyParamState();
+    // ---- MQTT 连接 ----
+    function connectMQTT() {
+        const url = `ws://${MQTT_HOST}:${MQTT_WS_PORT}/mqtt`;
+        mqttClient = mqtt.connect(url, {
+            clientId: CLIENT_ID,
+            username: USERNAME,
+            password: PASSWORD,
+            keepalive: 60,
+            reconnectPeriod: 5000
+        });
 
-            // 发送指令给 ESP32（告知显示屏是否显示该参数）
-            const cmd = {};
-            const key = 'display_' + param;
-            cmd[key] = paramState[param] ? 1 : 0;
-            client.publish(TOPIC_SUB, JSON.stringify(cmd));
-            console.log('📤 发送显示控制:', cmd);
-        }
-
-        // 设置连接状态
-        function setStatus(ok) {
-            isConnected = ok;
-            connStatus.className = 'status-badge ' + (ok ? 'connected' : 'disconnected');
-            connStatus.innerHTML = '<span class="dot"></span>' + (ok ? '已连接' : '断开连接');
-        }
-
-        // LED / 蜂鸣器指令
-        function sendCmd(type) {
-            if (!isConnected) { alert('MQTT 未连接'); return; }
-            const p = {};
-            if (type === 'led') {
-                ledState = !ledState;
-                p.SetLED = ledState ? 1 : 0;
-                $('btn-led').textContent = ledState ? '🔴 LED 开' : '⚫ LED 关';
-                $('btn-led').className = 'ctrl-btn' + (ledState ? ' on' : '');
-            }
-            if (type === 'buzzer') {
-                buzzerState = !buzzerState;
-                p.buzzer = buzzerState ? 1 : 0;
-                $('btn-buzzer').textContent = buzzerState ? '🔊 蜂鸣器 开' : '🔇 蜂鸣器 关';
-                $('btn-buzzer').className = 'ctrl-btn' + (buzzerState ? ' on' : '');
-            }
-            client.publish(TOPIC_SUB, JSON.stringify(p));
-        }
-
-        // 连接 MQTT
-        function connectMQTT() {
-            setStatus(false);
-            client = mqtt.connect(MQTT_BROKER_URL, {
-                clientId: CLIENT_ID,
-                username: USERNAME,
-                password: PASSWORD,
-                keepalive: 60,
-                reconnectPeriod: 5000,
-                connectTimeout: 30000
+        mqttClient.on('connect', () => {
+            console.log('✅ MQTT WebSocket 连接成功');
+            mqttClient.subscribe(SUB_TOPIC, (err) => {
+                if (!err) console.log(`订阅主题: ${SUB_TOPIC}`);
             });
+            // 可发送一次空消息请求数据（视平台支持）
+        });
 
-            client.on('connect', function() {
-                console.log('✅ MQTT 连接成功');
-                setStatus(true);
-                client.subscribe(TOPIC_PUB, { qos: 0 });
-            });
-
-            client.on('message', function(topic, msg) {
+        mqttClient.on('message', (topic, message) => {
+            if (topic === SUB_TOPIC) {
                 try {
-                    const raw = msg.toString();
-                    const data = JSON.parse(raw);
-
-                    // 兼容多种数据格式
-                    let p = { tem: 0, hum: 0, lux: 0 };
-                    if (Array.isArray(data)) {
-                        data.forEach(i => {
-                            if (i.id === 'temperature') p.tem = i.value;
-                            if (i.id === 'humidity') p.hum = i.value;
-                            if (i.id === 'lux') p.lux = i.value;
+                    const payload = JSON.parse(message.toString());
+                    // 期望 payload 是数组，例如 [{"id":"temperature","value":25.5}, ...]
+                    const data = {};
+                    if (Array.isArray(payload)) {
+                        payload.forEach(item => {
+                            data[item.id] = item.value;
                         });
-                    } else if (data.tem !== undefined || data.temperature !== undefined) {
-                        p.tem = data.tem || data.temperature || 0;
-                        p.hum = data.hum || 0;
-                        p.lux = data.lux || 0;
-                        // 可能还包含 display_xxx 字段
-                        if (data.display_temperature !== undefined) p.display_temperature = data.display_temperature;
-                        if (data.display_humidity !== undefined) p.display_humidity = data.display_humidity;
-                        if (data.display_lux !== undefined) p.display_lux = data.display_lux;
                     } else {
-                        // 尝试提取任何可能的数值
-                        p.tem = data.tem || data.Temperature || 0;
-                        p.hum = data.hum || data.Humidity || 0;
-                        p.lux = data.lux || data.Lux || 0;
+                        // 如果是对象则直接使用
+                        Object.assign(data, payload);
                     }
-                    updateUI(p);
-                } catch (e) {
-                    console.log('📩 收到原始消息（非JSON）:', msg.toString());
+                    updateUI(data);
+                } catch(e) {
+                    console.warn('解析数据失败:', e);
                 }
-            });
+            }
+        });
 
-            client.on('close', function() {
-                console.log('❌ 断开');
-                setStatus(false);
-            });
+        mqttClient.on('error', (err) => {
+            console.error('❌ MQTT 错误:', err);
+        });
 
-            client.on('error', function(e) {
-                console.error('错误:', e);
-                setStatus(false);
-            });
+        mqttClient.on('close', () => {
+            console.warn('MQTT 连接断开，尝试重连...');
+        });
+    }
+
+    // ---- 发送控制指令 ----
+    function sendCommand(cmd, value) {
+        if (mqttClient && mqttClient.connected) {
+            const msg = JSON.stringify({ [cmd]: value });
+            mqttClient.publish(PUB_TOPIC, msg);
+            console.log(`发送指令: ${msg}`);
+        } else {
+            console.warn('MQTT 未连接，无法发送指令');
         }
+    }
 
-        window.onload = connectMQTT;
-    </script>
+    // ---- 反馈开关事件 ----
+    feedbackToggle.addEventListener('change', function() {
+        const val = this.checked ? 1 : 0;
+        sendCommand('SetLED', val);   // 控制 LED（也可改为 'buzzer'）
+        feedbackStatus.textContent = this.checked ? '是' : '否';
+        feedbackStatus.className = 'status ' + (this.checked ? 'on' : 'off');
+    });
+
+    // ---- 页面加载 ----
+    window.onload = function() {
+        updateButton(0);
+        updateButton(1);
+        updateButton(2);
+        connectMQTT();
+    };
+</script>
 </body>
 </html>
